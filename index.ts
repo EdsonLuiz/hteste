@@ -1,11 +1,36 @@
-import { getWeather, searchCities } from "./src/api.ts";
+import { getForecast, getWeather, searchCities } from "./src/api.ts";
 import { addCity, loadCities, removeCity } from "./src/cities.ts";
 import { loadConfig, saveConfig, setUnit } from "./src/config.ts";
-import type { City } from "./src/types.ts";
-import { askCityName, askOption, askYesNo, displayError, displayMessage, displayWeather, pressToContinue, showMenu } from "./src/ui.ts";
+import type { City, Config } from "./src/types.ts";
+import {
+  askCityName,
+  askOption,
+  askYesNo,
+  displayError,
+  displayForecast,
+  displayMessage,
+  displayWeather,
+  pressToContinue,
+  showMenu,
+  withLoading,
+  type MenuAction,
+} from "./src/ui.ts";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function defaultCity(cities: City[], config: Config): City | null {
+  return config.defaultCityIndex !== null ? (cities[config.defaultCityIndex] ?? null) : null;
+}
+
+function cityLabel(city: City): string {
+  return [city.name, city.admin1, city.country].filter(Boolean).join(", ");
+}
+
+function formatCity(city: City, index: number): string {
+  const location = [city.admin1, city.country].filter(Boolean).join(", ");
+  return `  ${index}. ${city.name}${location ? ` (${location})` : ""}`;
 }
 
 async function showWeatherForCity(city: City | null): Promise<void> {
@@ -15,7 +40,7 @@ async function showWeatherForCity(city: City | null): Promise<void> {
   }
   try {
     const config = await loadConfig();
-    const weather = await getWeather(city, config.unit);
+    const weather = await withLoading("Fetching weather", () => getWeather(city, config.unit));
     displayWeather(weather);
   } catch (error) {
     displayError(errorMessage(error));
@@ -31,7 +56,7 @@ async function weatherForAllCities(): Promise<void> {
   const config = await loadConfig();
   for (const city of cities) {
     try {
-      const weather = await getWeather(city, config.unit);
+      const weather = await withLoading(`Fetching weather for ${city.name}`, () => getWeather(city, config.unit));
       displayWeather(weather);
     } catch (error) {
       displayError(`${city.name}: ${errorMessage(error)}`);
@@ -39,9 +64,35 @@ async function weatherForAllCities(): Promise<void> {
   }
 }
 
-function formatCity(city: City, index: number): string {
-  const location = [city.admin1, city.country].filter(Boolean).join(", ");
-  return `  ${index}. ${city.name}${location ? ` (${location})` : ""}`;
+async function showForecastForCity(city: City | null): Promise<void> {
+  if (!city) {
+    displayMessage("No city configured. Use option 3 to add a city.");
+    return;
+  }
+  try {
+    const config = await loadConfig();
+    const forecast = await withLoading("Fetching 7-day forecast", () => getForecast(city, config.unit));
+    displayForecast(forecast);
+  } catch (error) {
+    displayError(errorMessage(error));
+  }
+}
+
+async function forecastForAllCities(): Promise<void> {
+  const cities = await loadCities();
+  if (cities.length === 0) {
+    displayMessage("No cities registered. Use option 3 to add a city.");
+    return;
+  }
+  const config = await loadConfig();
+  for (const city of cities) {
+    try {
+      const forecast = await withLoading(`Fetching 7-day forecast for ${city.name}`, () => getForecast(city, config.unit));
+      displayForecast(forecast);
+    } catch (error) {
+      displayError(`${city.name}: ${errorMessage(error)}`);
+    }
+  }
 }
 
 async function searchAndAddCity(): Promise<void> {
@@ -49,7 +100,7 @@ async function searchAndAddCity(): Promise<void> {
   if (!query) return;
 
   try {
-    const results = await searchCities(query);
+    const results = await withLoading("Searching cities", () => searchCities(query));
     if (results.length === 0) {
       displayMessage("No city found.");
       return;
@@ -66,9 +117,7 @@ async function searchAndAddCity(): Promise<void> {
     }
 
     const chosen = results[selection - 1]!;
-    if (chosen.country) {
-      console.log(`  ${chosen.name} (${chosen.country})`);
-    }
+    console.log(`  ${cityLabel(chosen)}`);
     if (askYesNo()) {
       if (await addCity(chosen)) {
         displayMessage(`Added "${chosen.name}" to your cities.`);
@@ -134,46 +183,45 @@ async function settingsFlow(): Promise<void> {
 }
 
 async function run(): Promise<void> {
-  while (true) {
+  let running = true;
+
+  while (running) {
     const config = await loadConfig();
     const cities = await loadCities();
-    showMenu(cities.length, config.unit);
+    const city = defaultCity(cities, config);
+    const unitLabel = config.unit === "celsius" ? "°C" : "°F";
+
+    const actions: MenuAction[] = [
+      { key: "1", label: "Default city weather", run: () => showWeatherForCity(city) },
+      { key: "2", label: `Weather for all cities (${cities.length})`, run: weatherForAllCities },
+      { key: "3", label: "Search and add city", run: searchAndAddCity },
+      { key: "4", label: "Remove city", run: removeCityFlow },
+      { key: "5", label: "Set default city", run: setDefaultCityFlow },
+      { key: "6", label: "7-day forecast (default)", run: () => showForecastForCity(city) },
+      { key: "7", label: "7-day forecast (all cities)", run: forecastForAllCities },
+      { key: "8", label: `Settings (${unitLabel})`, run: settingsFlow },
+      { key: "9", label: "Exit", run: () => { running = false; } },
+    ];
+
+    showMenu(actions);
 
     const option = askOption();
     if (option === null) {
-      displayMessage("Goodbye!");
-      return;
-    }
-    switch (option) {
-      case "1": {
-        const city = config.defaultCityIndex !== null ? cities[config.defaultCityIndex] : null;
-        await showWeatherForCity(city ?? null);
-        break;
-      }
-      case "2":
-        await weatherForAllCities();
-        break;
-      case "3":
-        await searchAndAddCity();
-        break;
-      case "4":
-        await removeCityFlow();
-        break;
-      case "5":
-        await setDefaultCityFlow();
-        break;
-      case "8":
-        await settingsFlow();
-        break;
-      case "9":
-        displayMessage("Goodbye!");
-        return;
-      default:
-        displayError("Invalid option.");
+      running = false;
+      continue;
     }
 
-    pressToContinue();
+    const action = actions.find((a) => a.key === option);
+    if (action === undefined) {
+      displayError("Invalid option.");
+    } else {
+      await action.run();
+    }
+
+    if (running) pressToContinue();
   }
+
+  displayMessage("Goodbye!");
 }
 
 await run();

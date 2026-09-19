@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "bun run index.ts --watch",
     "run": "bun run index.ts",
+    "test": "bun test",
     "build": "bun build index.ts --compile --outfile weather"
   }
 }

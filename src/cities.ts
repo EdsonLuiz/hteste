@@ -1,24 +1,14 @@
 import type { City } from "./types.ts";
+import { loadJson, saveJson } from "./storage.ts";
 
-const CITIES_PATH = `${Bun.env.HOME ?? "."}/.weather-cli/cities.json`;
-
-async function ensureDir(): Promise<void> {
-  const dir = CITIES_PATH.replace(/\/[^/]+$/, "");
-  await Bun.$`mkdir -p ${dir}`;
-}
+const CITIES_FILE = "cities.json";
 
 export async function loadCities(): Promise<City[]> {
-  const file = Bun.file(CITIES_PATH);
-  if (await file.exists()) {
-    const raw = await file.json();
-    return Array.isArray(raw) ? raw : [];
-  }
-  return [];
+  return loadJson<City[]>(CITIES_FILE, []);
 }
 
 export async function saveCities(cities: City[]): Promise<void> {
-  await ensureDir();
-  await Bun.write(CITIES_PATH, JSON.stringify(cities, null, 2));
+  await saveJson(CITIES_FILE, cities);
 }
 
 export async function addCity(city: City): Promise<boolean> {

@@ -1,22 +1,23 @@
-import type { Unit, Weather } from "./types.ts";
+import type { Forecast, Weather } from "./types.ts";
+import { isTty, paint } from "./colors.ts";
 
 const LINE = "═".repeat(39);
-const WIDTH = 39;
 
-export function showMenu(cityCount: number, unit: Unit): void {
-  const unitLabel = unit === "celsius" ? "°C" : "°F";
+export interface MenuAction {
+  key: string;
+  label: string;
+  run: () => Promise<void> | void;
+}
+
+export function showMenu(actions: MenuAction[]): void {
   console.clear();
-  console.log(LINE);
-  console.log("          WEATHER CLI");
-  console.log(LINE);
-  console.log(`  1. Default city weather`);
-  console.log(`  2. Weather for all cities (${cityCount})`);
-  console.log(`  3. Search and add city`);
-  console.log(`  4. Remove city`);
-  console.log(`  5. Set default city`);
-  console.log(`  8. Settings (${unitLabel})`);
-  console.log(`  9. Exit`);
-  console.log(LINE);
+  console.log(paint(LINE, "cyan"));
+  console.log(paint("          WEATHER CLI", "cyan"));
+  console.log(paint(LINE, "cyan"));
+  for (const action of actions) {
+    console.log(`  ${action.key}. ${action.label}`);
+  }
+  console.log(paint(LINE, "cyan"));
 }
 
 export function askOption(): string | null {
@@ -38,20 +39,53 @@ export function displayWeather(weather: Weather): void {
   const { city, temperature, unit, time } = weather;
   const unitLabel = unit === "celsius" ? "°C" : "°F";
   const location = [city.name, city.admin1, city.country].filter(Boolean).join(", ");
-  console.log(LINE);
+  console.log(paint(LINE, "cyan"));
   console.log(`  ${location}`);
-  console.log(`  ${temperature.toFixed(1)} ${unitLabel}  (${time})`);
-  console.log(LINE);
+  console.log(`  ${paint(`${temperature.toFixed(1)} ${unitLabel}`, "yellow")}  (${time})`);
+  console.log(paint(LINE, "cyan"));
 }
 
 export function displayError(message: string): void {
-  console.log(`  ⚠ ${message}`);
+  console.log(paint(`  ⚠ ${message}`, "red"));
+}
+
+export function displayForecast(forecast: Forecast): void {
+  const { city, unit, days } = forecast;
+  const unitLabel = unit === "celsius" ? "°C" : "°F";
+  const location = [city.name, city.admin1, city.country].filter(Boolean).join(", ");
+  console.log(paint(LINE, "cyan"));
+  console.log(`  ${location} — 7-day forecast`);
+  for (const day of days) {
+    const dayOfMonth = new Date(day.date).getDate();
+    const temps = paint(`${day.min.toFixed(0)}°/${day.max.toFixed(0)}${unitLabel}`, "yellow");
+    console.log(`  ${dayOfMonth} - ${temps} - ${day.condition}`);
+  }
+  console.log(paint(LINE, "cyan"));
 }
 
 export function displayMessage(message: string): void {
-  console.log(`  ${message}`);
+  console.log(paint(`  ${message}`, "green"));
 }
 
 export function pressToContinue(): void {
   prompt("  Press Enter to continue...");
+}
+
+const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
+export async function withLoading<T>(label: string, task: () => Promise<T>): Promise<T> {
+  if (!isTty()) return task();
+  let frame = 0;
+  const started = performance.now();
+  process.stdout.write(`  ${label}... `);
+  const timer = setInterval(() => {
+    process.stdout.write(`\r  ${label}... ${SPINNER_FRAMES[frame++ % SPINNER_FRAMES.length]} `);
+  }, 80);
+  try {
+    return await task();
+  } finally {
+    clearInterval(timer);
+    const ms = Math.round(performance.now() - started);
+    process.stdout.write(`\r  ${label}... done (${ms}ms)\n`);
+  }
 }

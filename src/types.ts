@@ -15,6 +15,21 @@ export interface Weather {
   time: string;
 }
 
+export type Condition = "Sunny" | "Cloudy" | "Rainy" | "Snowy" | "Foggy";
+
+export interface DailyForecast {
+  date: string;
+  min: number;
+  max: number;
+  condition: Condition;
+}
+
+export interface Forecast {
+  city: City;
+  unit: Unit;
+  days: DailyForecast[];
+}
+
 export interface Config {
   unit: Unit;
   defaultCityIndex: number | null;

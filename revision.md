@@ -1,10 +1,10 @@
 # Weather CLI Review
 
-- [ ] **Colors:** None implemented; need to define cyan (menu), yellow (temp), and green/red (ok/error).
-- [ ] **Tests:** None exist; it would be best to at least test storage and API interactions using mocks.
-- [ ] **Binary:** Compiles correctly; verify that `./weather` saves data to `~/.config/weather-cli/`.
-- [ ] **Scalability:** How easy will it be to add new features?
-- [ ] **Loading:** Is there a loading state for asynchronous tasks?
-- [ ] **7 day forecast:** Weather forecast for the next 7 days. Example output:
-    [day of the month - min/max - rain, sun, cloudy]
-    [day of the month - min/max - rain, sun, cloudy]
+- [x] **Colors:** Cyan for menu, yellow for temperature, green for messages, red for errors (`src/colors.ts`, TTY-aware).
+- [x] **Tests:** Storage and API tests with mocks via `bun test` (18 tests in `tests/`).
+- [x] **Binary:** Compiles correctly; verified that `./weather` saves data to `~/.config/weather-cli/` (old `~/.weather-cli/` data migrated).
+- [x] **Scalability:** Menu is now a data-driven registry (`MenuAction[]`); adding a feature means adding one entry.
+- [x] **Loading:** `withLoading()` spinner shown for asynchronous tasks (weather, search, forecast).
+- [x] **7 day forecast:** Options 6/7 render the next 7 days. Example output:
+    [day of the month - min/max - condition]
+    [day of the month - min/max - condition]
