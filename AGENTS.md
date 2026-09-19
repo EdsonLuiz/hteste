@@ -25,6 +25,17 @@ Weather CLI app using **Bun.js** + **TypeScript** + **OpenMeteo API**. Entry poi
 - `tsconfig.json` - TypeScript config (strict, ESNext, bundler mode)
 - `package.json` - Bun project config, private module
 
+## Commit Style
+Use **Conventional Commits** with a short scope-less subject following the pattern seen in previous commits:
+- `feat: <description>` - new feature/functionality
+- `docs: <description>` - documentation changes
+- `chore: <description>` - maintenance/tooling changes
+
+Examples from the repo:
+- `feat: add weather CLI application with multi-city support...`
+- `docs: create agents.md`
+- `chore: add build result`
+
 ## Development Notes
 - No existing tests or CI
 - No formatter/linter configured (Bun has built-in formatting via `bun fmt` if needed)
