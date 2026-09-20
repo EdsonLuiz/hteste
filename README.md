@@ -1,5 +1,9 @@
 ## Weather CLI APP
 
+![Version](https://img.shields.io/github/package_json/version/EdsonLuiz/hteste?filename=package.json)
+![Build Status](https://github.com/EdsonLuiz/hteste/actions/workflows/ci-cd.yml/badge.svg)
+![Test Details](https://github.com/EdsonLuiz/hteste/actions/workflows/ci-cd.yml/badge.svg?event=push)
+
 The goal of this application is to create a console application that asks us to enter a city. At the end, we will generate an executable binary.
 
 ### Options:
