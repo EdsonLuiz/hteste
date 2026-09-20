@@ -99,8 +99,8 @@ jobs:
           echo "Bump: $BUMP"
           echo "Next version: $NEXT_VERSION"
           echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "$TAG" > "$TAG_FILE"
-          echo "$TAG" >> "$GITHUB_OUTPUT"
 
           # Generate release notes (changelog)
           {
