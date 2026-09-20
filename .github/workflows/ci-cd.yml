@@ -1,0 +1,150 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.bun/bin:$PATH"
+          bun --version
+      - run: bun install
+      - run: bunx tsc --noEmit
+      - run: bun test
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' || startsWith(github.ref, 'refs/heads/main') || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash
+          export BUN_INSTALL="$HOME/.bun"
+          export PATH="$BUN_INSTALL/bin:$PATH"
+          echo "$BUN_INSTALL/bin" >> "$GITHUB_PATH"
+          bun --version
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Determine version bump and next version
+        id: version
+        run: |
+          set -euo pipefail
+          echo "Reading current version from package.json"
+          CURRENT_VERSION=$(jq -r .version package.json)
+          echo "Current version: $CURRENT_VERSION"
+
+          TAG_FILE="/tmp/release_tag.txt"
+          NOTES_FILE="/tmp/release_notes.md"
+          : > "$TAG_FILE"
+          : > "$NOTES_FILE"
+
+          # Skip if HEAD already has a v* tag
+          if git describe --tags --exact-match --match 'v*' HEAD >/dev/null 2>&1; then
+            echo "HEAD already tagged, skipping release"
+            echo "skip_release=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Collect commits since last tag
+          LAST_TAG=$(git tag --list 'v*' --sort=-creatordate | head -n 1 || true)
+          if [ -n "$LAST_TAG" ]; then
+            COMMITS=$(git log "$LAST_TAG..HEAD" --pretty=format:"- %s (%h)" || true)
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" || true)
+          fi
+
+          # Determine bump level from Conventional Commits
+          BUMP="patch"
+          case "$COMMITS" in
+            *"feat!:"* | *"BREAKING CHANGE"*) BUMP="major" ;;
+            *"feat:"*) BUMP="minor" ;;
+            *"fix:"*) BUMP="patch" ;;
+          esac
+
+          # Bump version manually (no semver dependency)
+          MAJOR=$(echo "$CURRENT_VERSION" | cut -d. -f1)
+          MINOR=$(echo "$CURRENT_VERSION" | cut -d. -f2)
+          PATCH=$(echo "$CURRENT_VERSION" | cut -d. -f3)
+          if [ "$BUMP" = "major" ]; then
+            MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+          elif [ "$BUMP" = "minor" ]; then
+            MINOR=$((MINOR + 1)); PATCH=0
+          else
+            PATCH=$((PATCH + 1))
+          fi
+          NEXT_VERSION="$MAJOR.$MINOR.$PATCH"
+          TAG="v$NEXT_VERSION"
+
+          echo "Bump: $BUMP"
+          echo "Next version: $NEXT_VERSION"
+          echo "next_version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "$TAG" > "$TAG_FILE"
+
+          # Generate release notes (changelog)
+          {
+            echo "## $TAG"
+            echo ""
+            echo "$COMMITS"
+          } > "$NOTES_FILE"
+          cat "$NOTES_FILE"
+
+      - name: Skip release if already tagged
+        if: steps.version.outputs.skip_release == 'true'
+        run: exit 0
+
+      - name: Bump version in package.json
+        run: |
+          NEXT_VERSION="${{ steps.version.outputs.next_version }}"
+          jq --arg v "$NEXT_VERSION" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
+          echo "Bumped package.json version to $NEXT_VERSION"
+
+      - name: Build binary
+        run: |
+          bun run build
+          ls -la weather
+
+      - name: Git config
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit package.json bump
+        run: |
+          git add package.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.next_version }} [skip ci]" || echo "No changes to commit"
+          git push origin HEAD || echo "Push skipped (branch protection may require review)"
+
+      - name: Create Git tag and GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG=$(cat /tmp/release_tag.txt)
+          git tag "$TAG"
+          git push origin "$TAG" || echo "Tag push skipped"
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file /tmp/release_notes.md \
+            weather
+          echo "Release $TAG created with binary"
