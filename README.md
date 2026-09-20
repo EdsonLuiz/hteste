@@ -29,7 +29,11 @@ https://api.open-meteo.com/v1/forecast?latitude=45.41117&longitude=-75.69812&cur
 ## Commands
 
 - Run: `bun run index.ts`
-- Build binary: `bun build index.ts --compile --outfile weather`
+- Build current platform binary: `bun run build`
+- Build macOS x64 binary: `bun run build:macos` → `weather-macos`
+- Build Linux x64 binary: `bun run build:linux` → `weather-linux`
+- Build Windows x64 binary: `bun run build:windows` → `weather-windows.exe`
+- Build all binaries: `bun run build:all`
 - Typecheck: `bunx tsc --noEmit`
 - Test: `bun test`
 
