@@ -14,6 +14,10 @@
     "dev": "bun run index.ts --watch",
     "run": "bun run index.ts",
     "test": "bun test",
-    "build": "bun build index.ts --compile --outfile weather"
+    "build": "bun build index.ts --compile --outfile weather",
+    "build:macos": "bun build index.ts --compile --target=bun-darwin-x64 --outfile=weather-macos",
+    "build:linux": "bun build index.ts --compile --target=bun-linux-x64 --outfile=weather-linux",
+    "build:windows": "bun build index.ts --compile --target=bun-windows-x64 --outfile=weather-windows.exe",
+    "build:all": "bun run build:macos && bun run build:linux && bun run build:windows"
   }
 }

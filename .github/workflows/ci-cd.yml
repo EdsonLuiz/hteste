@@ -120,10 +120,10 @@ jobs:
           jq --arg v "$NEXT_VERSION" '.version = $v' package.json > package.json.tmp && mv package.json.tmp package.json
           echo "Bumped package.json version to $NEXT_VERSION"
 
-      - name: Build binary
+      - name: Build binaries
         run: |
-          bun run build
-          ls -la weather
+          bun run build:all
+          ls -la weather-macos weather-linux weather-windows.exe
 
       - name: Git config
         run: |
@@ -146,5 +146,7 @@ jobs:
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file /tmp/release_notes.md \
-            weather
-          echo "Release $TAG created with binary"
+            weather-macos \
+            weather-linux \
+            weather-windows.exe
+          echo "Release $TAG created with platform binaries"

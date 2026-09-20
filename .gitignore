@@ -4,6 +4,10 @@ node_modules
 # output
 out
 dist
+weather
+weather-macos
+weather-linux
+weather-windows.exe
 *.tgz
 
 # code coverage
